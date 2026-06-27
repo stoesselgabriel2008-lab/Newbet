@@ -1,100 +1,101 @@
-# 🧾 AUDIT-LOG — Construction du prompt de paris v11 (architecte v2)
+# 🧾 AUDIT-LOG — Construction du prompt de paris v12 (architecte v3)
 
-Journal du pipeline d'agents : recherche → build → audit → contre-audit → LLM Council → itération, **plus l'arbitrage final de l'Agent 0 (orchestrateur)**.
+Journal du pipeline d'agents : recherche → build → audit → contre-audit → LLM Council → itération → **vérification finale (re-vote sur la version corrigée)**.
 
-- **Base** : prompt v10 (pièce jointe `V10_katchauou.docx`).
-- **Cible** : `PROMPT-PARIS-FINAL.md` (v11).
-- **Exécution** : 1 workflow, **20 agents**, ~463 k tokens, 6 escadrons de recherche (web), 6 auditeurs adversariaux, 1 contre-auditeur, 3 conseillers + 1 synthèse.
-- **3 changements imposés** appliqués : (1) suppression totale bankroll/sizing/Kelly ; (2) toujours **b + a** (plaisir+combiné en avant, value pure à la fin) ; (3) base v10 améliorée, optimisée Claude (XML, logique conditionnelle, ≤ 12 règles dures).
+- **Base** : fusion v10 (`promptparissportifsv10FINALE`) + v11 (`v11PROMPTPARISFINAL`), guidée par le **méga-prompt architecte v3**.
+- **Cible** : `PROMPT-PARIS-FINAL.md` (v12) + `CE-QUE-DIT-LE-NET.md` (modèle).
+- **Exécution** : 2 workflows, **23 agents** (~1,17 M tokens). Workflow principal : 6 escadrons de recherche + 1 architecte + 7 auditeurs adversariaux + 1 contre-auditeur + 3 conseillers + 1 itération finale. Workflow de vérification : 1 linter arithmétique + 3 conseillers (re-vote sur la version corrigée).
+- **Mission** : produire un prompt quotidien exceptionnel (passionné + sharp, recherche web/pronostiqueurs poussée et visible, tout le menu marchés vivants d'abord, cotes réelles vérifiées, combinés qui paient, toujours b + a, sans bankroll) **et corriger les 6 problèmes P1-P6** observés sur le run v11.
+
+> Le `deep-research` (skill) **n'a pas été utilisé** (consigne explicite). Le travail est un travail de prompt-engineering : fusion + correction + audit adversarial, pas une recherche profonde longue.
 
 ---
 
-## 1. Escadron RECHERCHE (R1–R6) — ce qui est ressorti
+## 1. Escadron RECHERCHE (R1-R6) — directives retenues
 
-| Agent | Sujet | Apports retenus |
+| Agent | Sujet | Apports pour v12 |
 |---|---|---|
-| **R1** | Prompt engineering Claude | Structure **XML** par blocs nommés ; **anti-sur-contrainte** (≤ ~12 règles, supprimer MAJUSCULES/« TU DOIS »/« JAMAIS », −19 % de suivi quand on empile les contraintes) ; **framing positif** (« retiens un pari si… » > « ne parie jamais sans… ») ; ancre marché = **prior explicite** (LLM surconfiants, confiance verbalisée qui sature) ; **self-check léger single-pass** (CoVe complète trop coûteuse) ; donner le **pourquoi** des règles ; few-shot diversifiés. *(Note : R1 recommandait aussi de « valoriser le no-bet » — voir §6, arbitré par l'Agent 0.)* |
-| **R2** | Quant paris | **Dévig** par méthode (multiplicatif équilibré / power favori lourd & 2-issues / **Shin** 1X2) ; `EV = p×cote−1` ; seuil de value dépendant de la cote, edge dans le bruit < ~2-3 % ou < écart entre méthodes → pas de value ; **CLV** = meilleur prédicteur du process ; **combinés same-match = corrélation tax ~20-25 %, jamais p1×p2 naïf** ; Poisson/Dixon-Coles/Elo seulement comme cadre qualitatif ; Prophet Arena / Schoenegger 2024 → LLM = synthétiseur calibré, pas oracle. **Aucun sizing/Kelly** (bankroll supprimée). |
-| **R3** | Sentiment & pronostiqueurs | Parsing **2 colonnes** (claim vérifiable vs pick/opinion, poids du pick = 0) ; sous-module **« suivre un prono »** avec checklist bloquante ; **test du mispricing nommable** ; biais du survivant ; dédup des sources corrélées ; juger les tipsters sur la **CLV** (> 200 paris), jamais sur les screenshots. |
-| **R4** | Analyse sportive | **« Chiffre avant interprétation »** : toute tactique sans donnée = « NARRATIF — non actionnable » ; champ **« déjà price ? »** anti-double-comptage ; **grilles par sport** (foot : Press/Press & set-pieces ; tennis : surface > serve/return > fatigue > H2H filtré ; US : repos/back-to-back) ; **steelman systématique** ; divergence forte vs marché = prudence. |
-| **R5** | Données & API | Ancre = **clôture Pinnacle dévigée** ; books FR = **cible de mise** (Coteur/Oddspedia), pas ancre ; stack gratuite (The Odds API, API-Football compos/blessures, Understat xG, **Sackmann** tennis Elo/surface) ; clés en variables d'env, cache CSV ; **KPI = CLV** vs clôture (football-data.co.uk colonnes *C/PSC) ; ne pas dépendre de SofaScore (API fragile). |
-| **R6** | Anti-sur-contrainte | **Hiérarchie de priorité explicite** pour arbitrer les conflits de règles ; directives positives ; **rationale + exemples canoniques annotés** ; phases modulaires nettes ; self-check final léger. *(R6 poussait « plancher d'action garanti ≠ plancher de paris » — l'Agent 0 a tranché en faveur du plancher de paris plaisir, voir §6.)* |
-
-→ Détail intégral et décisions d'intégration dans **`TOUS-LES-MEILLEURS-TRUCS.md`**.
+| **R1** | Prompt engineering Claude | XML par blocs nommés ; anti-sur-contrainte (≤ 12 règles, framing positif, pas d'ordres absolus en majuscules) ; ancre = prior explicite ; permission d'incertitude **sans** permission de no-bet ; self-check léger single-pass ; donner le *pourquoi* des règles. |
+| **R2** | Quant paris | Dévig mult/power/Shin + quand utiliser chacun ; `EV = p×cote−1` ; **seuil sur l'EV** = MAX(écart méthodes × cote, marge liquidité) ; **test ±2 pts** pour tuer l'edge dans le bruit (P2) ; distinction `ECART_PROBA`/`EV` ; corrélation des combinés ; CLV qualitative ; **aucun sizing/Kelly**. |
+| **R3** | Pronostiqueurs & sentiment *(renforcé P3)* | Scan large (Forebet, Dimers, Pronosoft, Coteur, Reddit, OLBG, bettingexpert, Covers, X) ; tri **INFO vérifiable** vs **PICK brut** (poids 0) ; **fade du consensus public** ; 3 biais (survivant, écho-chamber, récence) ; checklist « suivre un prono » ; **format exact d'une section visible « 📣 Ce que dit le net »**. |
+| **R4** | Analyse sportive *(renforcé P5, nourrit P4/P6)* | Grilles foot (PPDA×xG, ligne haute/vitesse, set-pieces, game-state) ; tennis (surface > serve/return > fatigue > H2H filtré) ; **grilles de lecture des marchés vivants** (BTTS, buteur, victoire+BTTS, over, handicap) ; autres sports ; « chiffre avant interprétation » ; reads vivants + grounded. |
+| **R5** | Données & cotes RÉELLES *(clé P1)* | Protocole de relevé des **vrais prix** (book FR + ancre sharp via Pinnacle/Oddspedia/Coteur, book/source + heure) ; statut de cote ✅/⚠️/❌ ; gate « pas de 🟢 sur cote non vérifiée » ; evidence ledger ; architecture 2 couches en MODE API ; MODE WEB par défaut (le repo n'a pas de clés). |
+| **R6** | Anti-sur-contrainte & couverture | Hiérarchie de priorité (paliers) ; directives positives ; **menu complet exploré** (P4, pas de repli 1X2) ; déclencheurs RADAR non limitatifs ; pièges à éviter (réduire < 12 règles casse le plancher ; buckets EV chiffrés = nombres magiques). |
 
 ---
 
-## 2. Escadron AUDIT (A1–A6) — FAIL avec preuve sur le draft B1
+## 2. Escadron AUDIT (A1-A7) — 24 fails avec preuve sur le draft
 
-**38 fails** levés. Les plus marquants :
+**2 BLOCKER, 9 MAJOR, 13 MINOR.** Les plus marquants :
 
-- **A1 (linter adversarial)** — proposait de réduire les 11-12 règles à 6-7 *(rejeté par C1, voir §3)* ; noms d'équipes réels dans l'exemple (gardés avec tag `[FICTIF]`).
-- **A2 (evidence/pricing ledger)** — `CLV attendu` **chiffré** (« +0,06 ») = **nombre prédictif halluciné** ; constantes hard-codées (CPA ~⅓ des buts, marge SGP ~20-25 %) présentées comme des faits du match ; **traçabilité cote** (book + heure) absente de `<evidence>` → CLV inauditable.
-- **A3 (couverture)** — grilles limitées à foot/tennis/US → **trou** basket/rugby/hockey/MMA/e-sport ; déclencheurs RADAR à rendre **non limitatifs**.
-- **A4 (maths/devig)** — **double définition incompatible du mot « edge »** (écart de proba vs ROI `p×cote−1`) : confirmée par calcul (à 2,05 elles coïncident ~+4,5 %, mais 4 pts de proba = +20 % de ROI à cote 5,0) → un seuil en points de proba **récompense mécaniquement les outsiders**, l'inverse du but. *(A4 voulait aussi des buckets EV chiffrés par tranche de cote — rejeté, voir §3.)*
-- **A5 (réalisme/honnêteté)** — manque le concept de **variance** dans la philosophie ; steelman à renforcer par l'**hypothèse nulle**.
-- **A6 (sécurité, bankroll supprimée)** — **aucun sizing/Kelly/% réintroduit (✔ confirmé)** ; mais « toute divergence forte = PRUDENCE » **sans porte de sortie** risquait d'étouffer toute value légitime (sur-prudence).
+- **A1 (linter)** — **arithmétique fabriquée dans l'exemple value phare** : « robustesse ±2 pts : +2,6 % / +6,6 % » alors que le calcul exact à cote 2,05 donne +0,45 % / +8,65 %. Hallucination numérique **dans le prompt anti-hallucination**. (BLOCKER)
+- **A1 (conséquence)** — une fois l'arithmétique corrigée, la borne basse réelle (+0,45 %) passe **sous le seuil de bruit** que le draft dérive lui-même (écart méthodes 1,5 pt × 2,05 ≈ 3,07 %) → l'exemple « 🟢 robuste » **échouait à son propre gate** et enseignait l'inverse de la règle 5. (BLOCKER)
+- **A4** — combiné « victoire + BTTS » étiqueté **corrélation positive** mais chiffré à l'envers (naïf 0,33 → ajusté 0,26 = baisse = négative). (MAJOR)
+- **A2 / A5** — repère buteur « ~45-55 % » sans la clause « jamais ressorti comme stat du jour » ; prose « EV ≈ borderline » fausse (50 % × 2,10 = +5,0 %). (MAJOR)
+- **A2** — jambes du combiné chiffrées (produit naïf) sans ligne au ledger ; stats tactiques décisives (PPDA, xG) jamais traçables. (MAJOR)
+- **A3** — l'**énumération complète du menu** de marchés (double chance, handicaps EU + asiatiques, totals 1,5/2,5/3,5, props) présente en v11 avait **disparu** au profit de « ≥ 3 familles ». (MAJOR — P4)
+- **A7** — la vérif ne contrôlait que la présence de la section 📣, **pas son rattachement** au ledger sentiment horodaté (un tableau 📣 halluciné passait). (MAJOR — P3)
+- **Fichier manquant** — le draft renvoyait à un `CE-QUE-DIT-LE-NET.md` **inexistant** → référence morte. (MAJOR)
 
 ---
 
 ## 3. CONTRE-AUDIT (C1) — red-team de l'audit
 
-C1 valide le draft comme **non-bloquant, sans bankroll réintroduite, b+a préservé**, et identifie **~9 fails réellement valides** + plusieurs **sur-corrections** à rejeter :
+C1 valide la majorité des fails et **rejette les sur-corrections** :
 
-**Fails endossés (corrigés dans v11) :** CLV chiffré → **direction qualitative** ; constantes CPA/SGP → **repères heuristiques non citables comme stat du jour** ; **edge** → deux grandeurs nommées (`ECART_PROBA` vs `EV/ROI`), seuil sur l'EV ; clause d'équilibre sur la prudence (**mispricing nommable** comme porte de sortie) ; **evidence ledger** book+heure avec dégradé gracieux ; grille **fallback autres sports** + déclencheurs RADAR non limitatifs ; phrase **variance** en philosophie ; **hypothèse nulle** dans le steelman.
+**Fails endossés (corrigés en v12) :** arithmétique Verdon recalculée ; exemple 🟢 relevé pour survivre réellement au seuil aux deux bornes ; corrélation combinée remise dans le bon sens + **règle directionnelle explicite** ; garde-fou étendu au repère buteur ; jambes de combiné + stats tactiques décisives **tracées au ledger** ; énumération du menu **réintroduite** ; 📣 **rattachée au ledger horodaté** (vérif 8b) ; référence morte **retirée** (contenu inline) ; vocabulaire de statut **unifié** ✅/⚠️/❌.
 
-**Sur-corrections rejetées :** réduire à 6-7 règles (risquait de supprimer plancher d'action + anti-double-comptage) ; **buckets EV chiffrés par tranche** (réintroduisait les « nombres magiques » que A2/A5 condamnent — contradiction interne de l'audit) ; rendre le plancher entièrement dérivé via MAX() en retirant le repère ~2-3 % ; renommer les équipes de l'exemple.
+**Sur-corrections rejetées :** forcer un chiffre d'EV sur tout 🎲 plaisir (le §0 autorise EV = « — ») ; rétrograder en « NARRATIF » **toute** stat non tracée (assécherait la couleur des compétitions discrètes — limité aux chiffres qui *portent* une décision 🟢) ; traiter les bornes BTTS « 6/7 & > 1,2/match » comme un gate dur (ce sont des **repères de lecture**) ; réécrire le freebet sur le fond.
+
+**Contrôles de sécurité :** `floor_intact = true`, `bankroll_reintroduced = false`.
 
 ---
 
 ## 4. LLM COUNCIL — note contre la rubrique
 
-3 conseillers indépendants (lentilles : *rigueur quant & honnêteté*, *utilité parieur & couverture*, *optimisation Claude & sobriété*) + 1 synthèse.
-
-- **Note globale consolidée : 8,6 / 10**, `pass = true` sur la version issue de l'itération.
-- **26 changements consolidés** appliqués au draft (dédupliqués depuis C1 + conseillers).
-- Audit final des gates : **0 BLOCKER, 0 MAJOR, 2 MINOR** (cohérence VALUE PURE↔BOÎTE ; mot « bornée » à réaligner sur règle 12) — les deux **corrigés** dans v11.
-
----
-
-## 5. ⚖️ ARBITRAGE FINAL DE L'AGENT 0 — le désaccord de fond (et sa résolution)
-
-**Ce qui résiste — et a dû être tranché par l'orchestrateur.** Le workflow a produit un prompt quant **excellent mais qui a inversé une exigence centrale et répétée du méga-prompt.** Sous l'influence de R1/R6 (guidance Anthropic anti-hallucination : « valoriser explicitement le *aucun pari* »), l'armée a érigé le **NO-BET en prior** :
-
-- règle Top-3 du draft : *« zéro quota — le NO-BET est un résultat valide »* ;
-- section plaisir/combiné reléguée en **« optionnel »** avec *« Pas de combiné plaisir défendable aujourd'hui »* ;
-- BOÎTE DE DÉCISION pouvant être **« vide — NO-BET »**.
-- C1 lui-même l'a noté : *« combiné plaisir 'toujours'… contredit le droit au NO-BET (règle 2) »* — preuve que **tout l'escadron avait internalisé l'inversion**.
-
-**Or le méga-prompt est sans ambiguïté et répété :** Gate bloquant n°1 *« Plancher d'action incassable — jamais 'aucun pari' »* (test : un jour sans value → sort-il **quand même** plaisir + combiné ?) ; §1 changement n°2 *« TOUJOURS b + a… le pari plaisir + le combiné mis en avant (le cœur de ce que joue l'utilisateur) »* ; §8 *« Toujours b + a. Plaisir + combiné en avant, value pure à la fin. »*
-
-**Résolution (appliquée dans v11).** Le méga-prompt avait **déjà pré-résolu** cette tension honnêteté ↔ plancher d'action : on sert **toujours** le pari plaisir + le combiné, mais on les **étiquette honnêtement** (`🎲 plaisir — EV négative assumée`, jamais maquillés en value) ; le **seul** palier qui peut être vide est la **value pure (+EV)**. L'honnêteté n'est pas de refuser de jouer — c'est de ne jamais vendre un pari plaisir comme du +EV.
-
-Donc, en tant qu'Agent 0, **j'ai bloqué la sortie du workflow et corrigé le framing**, en conservant **intégralement** la machinerie quant (dévig multi-méthodes, distinction `ECART_PROBA`/`EV`, anti-double-comptage « déjà price ? », steelman + hypothèse nulle, evidence ledger traçable, variance/CLV, no-bankroll, garde-fou unique) :
-
-| Drift du workflow | Correction Agent 0 (v11) |
-|---|---|
-| « zéro quota — NO-BET valide » en Top-3 | **Plancher d'action sacré** en Top-3 : toujours plaisir + combiné, jamais « aucun pari » |
-| Plaisir/combiné « optionnel » | Section **🎲🚀 OBLIGATOIRE en avant** (b), value pure conditionnelle à la fin (a) |
-| BOÎTE « vide — NO-BET » | BOÎTE **jamais vide** (≥ le pari plaisir) ; le « rien aujourd'hui » vit dans la **section value** |
-| Identité « trader qui dit rien aujourd'hui » | Restauration de l'identité **passionné + sharp**, marchés vivants, plaisir-first |
-| Honnêteté = abstention | Honnêteté = **étiquetage** (plaisir ≠ value) ; variance/CLV/no-profit **conservés** |
-
-→ Les exemples « jour pauvre » et « données manquantes » de v11 démontrent que le **plancher tient** tout en disant franchement « aucune value pure aujourd'hui ».
+- **Sur le draft (avant itération)** : 3 conseillers indépendants (rigueur quant & honnêteté · utilité parieur/marchés vivants/fun · Claude & sobriété) → moyenne **6,33/10**, `pass = false` les trois, à cause des 2 BLOCKER d'arithmétique + corrélation à l'envers + fichier manquant.
+- **Itération** : l'architecte applique les fails endossés + minors du Council, garde le plancher + b + a + zéro bankroll, n'applique pas les sur-corrections rejetées.
+- **Vérification finale (re-vote sur la version corrigée)** : 1 linter arithmétique (recalcul de **chaque** nombre de l'exemple) + 3 conseillers re-notent.
+  - **Linter : `gate_pass = true`**, 0 erreur d'arithmétique, 0 nombre fabriqué, 0 contradiction, 0 blocker ouvert — « PRÊT À EXPÉDIER ».
+  - **Council : 9,3 · 9,4 · 8,7 → moyenne 9,13/10**, `pass = true` les trois, **0 blocker, 0 major** (sauf un major de **sobriété** non bloquant, voir §6).
+  - **`all_pass = true`.**
 
 ---
 
-## 6. ✅ GATES BLOQUANTS — statut final (v11)
+## 5. Comment chaque problème P1-P6 est corrigé
+
+| # | Problème v11 | Correction v12 |
+|---|---|---|
+| **P1** | Cotes non vérifiées → no-vig faux, 🟢 sur du sable | Règle 2 (PALIER 0) + `<cotes_reelles>` : book/source + **heure** obligatoires pour tout 🟢 ; statut **✅/⚠️/❌ unifié** de bout en bout ; cote ⚠️/❌ **interdit le 🟢** et force EV = « — » ; vérif point 7 rétrograde tout 🟢 sans cote ✅. L'incertitude **rétrograde l'étiquette, ne vide jamais la boîte** (plancher préservé). |
+| **P2** | Pari peu probable headliné comme value, edge dans le bruit | Règle 6 : pas de headline d'un simple à faible proba (< ~35-40 %) sur cote non vérifiée/edge dans le bruit. Règle 5 + Étape 5 : **seuil sur l'EV** = MAX(écart méthodes × cote, marge liquidité) + **test ±2 pts**. L'exemple value survit désormais aux deux bornes ; l'anti-pattern « nul @3,40 » est conservé comme **contre-modèle annoté** (arithmétique exacte). |
+| **P3** | Recherche web + pronostiqueurs insuffisants/invisibles | `<recherche_web>` (≥ 5 familles, tri INFO/PICK poids 0, fade du public, 3 biais, checklist suivre-un-prono) + Étape moteur 2 + **section de sortie OBLIGATOIRE « 📣 Ce que dit le net »** (3 blocs) **tracée au ledger sentiment horodaté** (vérif 8b). Modèle détaillé dans `CE-QUE-DIT-LE-NET.md`. |
+| **P4** | Limité au 1X2 | Étape 1 : **énumération complète du menu** (double chance, handicaps EU + asiatiques, totals 1,5/2,5/3,5, BTTS, scorers, buteurs, props, combinés) + ≥ 3 familles/match. Règle 6 ancre le tier plaisir/combiné dans les **marchés vivants** (1X2 sec = dernier recours, à dire). Étape 4 : grille de lecture par marché vivant. |
+| **P5** | Manque de passion / profondeur tactique | `<role>` exige des reads de connaisseur (duel concret, détail tactique juste, pas de superlatifs). Étape 4 : 6 lignes foot + grilles marchés vivants/tennis/autres sports ; « chiffre avant interprétation » ; connexion obligatoire marché + mispricing. |
+| **P6** | Combinés ennuyeux à payout ridicule | Règle 7 + Étape 7 : cote **excitante ~2,0-4,0**, **bet builder à corrélation positive préféré** (proba ajustée > produit naïf), produit naïf + proba réelle + **sens de la corrélation** affichés, chaque jambe tracée. Exemple corrigé en « victoire + Over » (vraie corrélation positive, 0,275 → 0,32, cote ~3,1). |
+
+---
+
+## 6. ⛔ GATES BLOQUANTS — statut final (v12)
 
 | Gate | Statut | Où |
 |---|---|---|
-| Plancher d'action incassable (jamais « aucun pari ») | ✅ | Règle 2 + Top-3 + format §3 + exemple jour pauvre |
-| b ET a toujours présents | ✅ | Règle 10 + format §3 (b) / §4 (a) + vérif. point 2 |
-| Zéro bankroll / sizing prescriptif réintroduit | ✅ | `<ce_que_je_te_donne>` + règle « mises libres » + vérif. point 6 (A6 confirmé) |
-| Zéro nombre/cote/match sans trace ou source | ✅ | Règles 4 & 12 + evidence ledger + CLV en direction qualitative |
-| No-vig : value vs dévigé, jamais cote brute | ✅ | Règles 3 & 6 + moteur étape 2 (mult/power/Shin) |
-| Couverture : balayage large + radar | ✅ | Moteur étape 1 + format §1 (compétitions discrètes, déclencheurs non limitatifs) |
-| Anti-sur-contrainte (≤ ~12 règles, logique conditionnelle, pas de contradiction) | ✅ | 12 règles priorisées + guides souples + framing positif/XML |
-| Honnêteté (aucune promesse d'edge garanti / pari « sûr ») | ✅ | Philosophie + règle 11 + variance + étiquetage plaisir |
+| Plancher d'action incassable (jamais « aucun pari ») + b ET a | ✅ PASS | Règle 1 (PALIER 0) + format §4/§5 + vérif 1, 2 + exemples jour pauvre & données manquantes |
+| Cotes vérifiées : pas de 🟢 sur cote non confirmée, book + heure (P1) | ✅ PASS | Règle 2 + `<cotes_reelles>` + colonne « Statut cote » + ledger + vérif 7 |
+| Pas d'edge-dans-le-bruit en 🟢 : seuil sur l'EV, test ±2 pts (P2) | ✅ PASS | Règle 5 + règle 12 + Étape 5 — **vérifié au calcul** (Verdon +5,4 %/+14,0 % > seuil 3,2 % ; nul @3,40 conservé en anti-pattern) |
+| Marchés vivants : menu complet exploré, tier plaisir/combiné en priorité (P4) | ✅ PASS | Étape 1 (menu réintroduit) + règle 6 + Étape 4 (grille par marché) + vérif 8a |
+| Recherche web + section « ce que dit le net » obligatoires (P3) | ✅ PASS | `<recherche_web>` + Étape 2 + format §2 + vérif 8b + ledger sentiment §6 |
+| Combinés qui paient (pas ennuyeux) (P6) | ✅ PASS | Règle 7 + Étape 7 + format §4 (exemple victoire+Over @3,1, corrélation positive) |
+| Zéro nombre/cote/match inventé ; zéro bankroll/sizing | ✅ PASS | Règle 3 + ledger §6 (cotes + sentiment + données tactiques) + vérif 4, 6 ; arithmétique recalculée |
+| Anti-sur-contrainte (≤ 12 règles, logique conditionnelle, pas de contradiction) + honnêteté | ✅ PASS | 12 règles en 4 paliers + guides souples + framing positif ; aucune promesse de profit |
 
-**Verdict final Agent 0 :** livrable conforme au méga-prompt après arbitrage. Le prompt v11 est exceptionnel sur le process (rigueur quant, anti-hallucination, lecture tactique grounded, couverture large) **et** fidèle au cœur de l'utilisateur (passionné qui joue pour le plaisir, toujours servi b + a, sans bankroll). Aucune promesse de profit — seulement un raisonnement honnête, chiffré et ancré.
+**Observation non bloquante (sobriété).** Le conseiller « Claude & sobriété » (pass = true, 8,7/10) note que v12 est dense (~310 lignes) avec une **redondance structurelle assumée** (statut de cote, règle de corrélation, test ±2 pts répétés à plusieurs endroits) et un `<exemple>` long (4 scénarios). Le linter et les deux autres conseillers jugent cette redondance **acceptable et intentionnelle** : un prompt collé à neuf chaque jour gagne en fiabilité à rappeler la règle au point d'usage, et la priorisation en 4 paliers + le marquage « règle dure vs guide souple » rendent la densité gérable. La longueur supplémentaire vs v11 est portée par les **nouvelles exigences réelles** (P1 `<cotes_reelles>`, P3 `<recherche_web>`/📣). Aucun gate §6 n'est en cause (les 12 règles dures sont respectées, sans contradiction). Piste d'allègement future possible (−40-60 lignes) : transformer les sections-guides en pures procédures qui *renvoient* aux règles dures au lieu de les ré-énoncer — à faire seulement si chaque fix reste présent une fois à son endroit canonique.
+
+---
+
+## 7. 📦 LIVRABLES
+
+1. **`PROMPT-PARIS-FINAL.md`** (v12) — le prompt quotidien : passionné + sharp, recherche web + pronostiqueurs poussée et **visible** (📣), tout le menu (marchés vivants d'abord), **cotes réelles vérifiées** (gate), **combinés qui paient**, toujours b + a, sans bankroll, optimisé Claude. 3 exemples (jour normal / jour pauvre / données manquantes) + contre-modèle anti-pattern P2.
+2. **`AUDIT-LOG.md`** — ce document.
+3. **`CE-QUE-DIT-LE-NET.md`** — le modèle (format exact) de la section pronostiqueurs/consensus produite chaque jour ; copie de référence d'un contenu **déjà inline** dans le prompt (qui reste autonome et collable seul).
+
+**Verdict final (Agent 0).** Livrable conforme au méga-prompt v3 : les 6 problèmes P1-P6 sont corrigés, les 8 gates bloquants sont verts, le Council re-vote la version corrigée à **9,13/10** (`pass` unanime) et le linter arithmétique confirme **0 erreur, 0 nombre fabriqué, 0 contradiction**. Le prompt conserve intégralement la machinerie quant de v11 (dévig multi-méthodes, `ECART_PROBA`/`EV`, anti-double-comptage, steelman + hypothèse nulle, evidence ledger, variance/CLV, no-bankroll) et restaure la chaleur et l'amplitude de menu de v10. Aucune promesse de profit — seulement un process honnête, chiffré, ancré sur des cotes réelles, qui sert toujours le pari plaisir + le combiné de l'utilisateur.
