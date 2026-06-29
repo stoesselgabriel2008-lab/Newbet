@@ -20,7 +20,8 @@ from datetime import datetime, timezone, timedelta
 import requests
 
 API_BASE = "https://api.the-odds-api.com/v4"
-BOOKMAKERS = ["betclic", "pinnacle"]
+# Clés bookmakers The Odds API : Betclic France = "betclic_fr" (et non "betclic").
+BOOKMAKERS = ["betclic_fr", "pinnacle"]
 REGIONS = "eu"  # Betclic + Pinnacle sont dans la région "eu"
 
 
@@ -122,7 +123,7 @@ def print_event(event: dict, market_key: str) -> None:
     away = event.get("away_team", "?")
     heure = fmt_local(event.get("commence_time", ""))
 
-    bet = bookmaker_odds(event, "betclic", market_key)
+    bet = bookmaker_odds(event, "betclic_fr", market_key)
     pin = bookmaker_odds(event, "pinnacle", market_key)
     if not bet and not pin:
         return  # aucun des deux books ne couvre ce match
