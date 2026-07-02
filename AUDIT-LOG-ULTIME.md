@@ -76,9 +76,10 @@ Ce qui améliore les paris mais vit **ailleurs** que dans le texte collé chaque
 
 ## 7. Tests finaux (réduits ÷5 sur instruction utilisateur) — résultats
 
-- **Contre-audit C1 (red-team du tribunal)** : tirage aléatoire tracé (`$RANDOM` → **P-07, P-05, P-12**) ; re-test des 3 verdicts sur les 3 slates : *(résultat ci-dessous, §7bis)*.
-- **Audit unifié** (linter + arithmétique + invariants un par un + sobriété + forensique + plancher) : *(résultat ci-dessous, §7bis)*.
-- **Council unifié** (5 lentilles : quant & honnêteté · décisions changées · passionné-expert · Fable 5 & sobriété · invariants/provenance) + re-vote si corrections : *(résultat ci-dessous, §7bis)*.
+- **Contre-audit C1 (red-team du tribunal)** : tirage aléatoire tracé (`$RANDOM` → **P-07, P-05, P-12**) ; re-test indépendant des 3 verdicts sur les 3 slates : **3/3 CONFIRMÉS** (P-07 hors-prompt : le bundle journal est inerte sur journal vide et v14 prend seul toutes les décisions revendiquées ; P-05 : le recalcul indépendant confirme que les seuils ×1,5 / 6 % tuent la seule 🟢 légitime du jour riche sans attraper le piège temporel ; P-12 : ex-aequo au mieux, dé-signalisation des sections d'exécution au pire). Verdict : **« tribunal fiable »** — arithmétique des juges exacte, charge de la preuve appliquée symétriquement ; un léger strawman relevé dans la motivation P-12 (sans portée sur le verdict), consigné ici.
+- **Audit unifié** (A1 linter + A2 arithmétique + A3 invariants + A5 sobriété + A6/A7 forensique) : **PASS — 0 BLOCKER, 0 MAJOR, 2 MINOR**. A2 : recalcul intégral de l'exemple, **aucune erreur** (dont seuil d'abandon 1,032/0,49 = 2,1061 → 2,11, contrôle 0,49×2,10−1 = +2,9 % < 3,2 %). A3 : **19/19 invariants présents**, un par un. A5 : diff v14→ULTIME = **6 hunks exactement** (titre l.1 — nominal, inhérent au renommage du livrable, consigné ici — · masthead l.6 · `<verif_betclic>` l.77 · `<format>` §8 l.181 · `<verification>` pt 6 l.200 · exemple l.284), reste octet-identique, 314 = 314. A6/A7 : preuve formelle que **X = (1+seuil)/p_borne_basse < cote servie pour toute 🟢 valide** (le seuil d'abandon ne peut jamais invalider une 🟢 au moment où elle est servie — il ne mord que si la cote a réellement fondu) ; la synchronie ne peut que rétrograder (jamais supprimer), le plancher est alimenté, aucun des deux mécanismes ne peut fabriquer de value. **MINOR corrigés** : « seuil » nu → « ce seuil d'abandon » (2 occurrences, §8) ; hunk-titre consigné.
+- **Council unifié** (5 lentilles) : **ALL-PASS** — ⚖️ quant & honnêteté **9** · 🎯 décisions changées **9** · 🔥 passionné-expert **8,5** · 🧠 Fable 5 & sobriété **9** · 🔒 invariants & provenance **8**. Corrections demandées (documentaires, appliquées) : remplir ce §7 avec les résultats réels et préciser le libellé du gate deep-research (§8).
+- **Re-vote final** (1 agent frais, version corrigée relue intégralement) : **PASS** — corrections présentes sans rien introduire (diff re-vérifié : 6 hunks, 314 = 314), §7 jugé fidèle et rien de sur-vendu, zéro régression (mécanismes intacts, invariants sondés présents), arithmétique Verdon recalculée en Python exacte (2,11 ; +2,9 % ; +9,7 % ; 0,2597 ; 3,87 ; bornes +5,4/+14,0 ; seuil 3,2). Aucun blocker.
 - Arithmétique re-vérifiée indépendamment en Python par Agent 0 : **15/15 exactes**.
 
 ## 8. ⛔ Gates bloquants — statut
@@ -86,11 +87,11 @@ Ce qui améliore les paris mais vit **ailleurs** que dans le texte collé chaque
 | Gate | Statut |
 |---|---|
 | Toute idée intégrée a un verdict ADOPTÉE motivé par des décisions changées sur les 3 slates, tracé | ✅ (2/2 : P-01, P-04 — §3) |
-| Tous les invariants présents sur le fond, un par un | ✅ (audit unifié §7bis) |
+| Tous les invariants présents sur le fond, un par un | ✅ (audit unifié §7 : 19/19) |
 | Fichier final ≤ v14 (314 lignes) | ✅ **314 = 314**, zéro dépassement à défendre |
-| Arithmétique des exemples exacte ; les exemples démontrent les nouveautés | ✅ (seuil d'abandon 2,11 + synchronie démontrés sur Verdon ; 15/15 recalculs) |
-| Aucune value fabriquée, aucune promesse, pas de bankroll, nul hors boîte, combo ~2,0+, plancher intact | ✅ (greps + audit) |
-| `deep-research` jamais utilisé ni mentionné | ✅ (grep = 0 sur les deux livrables hors cette ligne de gate) |
+| Arithmétique des exemples exacte ; les exemples démontrent les nouveautés | ✅ (seuil d'abandon 2,11 + synchronie démontrés sur Verdon ; recalculs Agent 0 + A2 : zéro erreur) |
+| Aucune value fabriquée, aucune promesse, pas de bankroll, nul hors boîte, combo ~2,0+, plancher intact | ✅ (greps + preuve forensique A6/A7, §7) |
+| `deep-research` jamais utilisé ni mentionné | ✅ (jamais invoqué dans le pipeline ; grep = 0 sur le prompt livré ; ce registre ne contient que des mentions de **non-usage**, exigées par le méga-prompt) |
 | Rejetées ET hors-prompt listées avec le pourquoi | ✅ (§3, §5, §6) |
 
 ## 9. 📦 Livrables & clôture
